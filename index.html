@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jitsi Video Call Platform</title>
+    <script src="https://8x8.vc/external_api.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(145deg, #0d1b2a 0%, #1b263b 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #e0e0e0;
+            overflow: hidden;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 25px;
+            padding: 40px;
+            width: 95%;
+            max-width: 1400px;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.5s ease-in;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2.8rem;
+            color: #00d4ff;
+            text-shadow: 0 0 15px rgba(0, 212, 255, 0.8);
+        }
+
+        .status-bar {
+            text-align: center;
+            font-size: 1.2rem;
+            color: #ffd700;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        button, input[type="text"] {
+            padding: 12px 25px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 50px;
+            background: linear-gradient(90deg, #00d4ff, #007bff);
+            color: #fff;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0, 212, 255, 0.4);
+        }
+
+        button:hover, input[type="text"]:focus {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 212, 255, 0.6);
+            outline: none;
+        }
+
+        button:disabled {
+            background: #444;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        button.active {
+            background: linear-gradient(90deg, #ff4d4d, #ff1a1a);
+        }
+
+        .main-content {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        #meet {
+            flex: 3;
+            min-height: 60vh;
+            border-radius: 15px;
+            overflow: hidden;
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .sidebar {
+            flex: 1;
+            min-width: 250px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 15px;
+        }
+
+        .participant-list, .chat-box {
+            margin-bottom: 20px;
+        }
+
+        .participant-list ul {
+            list-style: none;
+            color: #fff;
+        }
+
+        .chat-box {
+            height: 200px;
+            overflow-y: auto;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            border-radius: 10px;
+        }
+
+        .error-message {
+            text-align: center;
+            color: #ff4d4d;
+            font-size: 1.2rem;
+            margin-top: 20px;
+            animation: shake 0.5s ease;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        @media (max-width: 768px) {
+            .container { padding: 20px; }
+            h1 { font-size: 2rem; }
+            button, input[type="text"] { padding: 10px 20px; font-size: 0.9rem; }
+            .main-content { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Jitsi Video Call Platform</h1>
+        <div class="status-bar" id="status-bar">Participants: 0 | Room: Not Connected</div>
+        <div class="controls">
+            <input type="text" id="room-input" placeholder="Enter Room Name (e.g., MyRoom)">
+            <button id="join-btn">Join Room</button>
+            <button id="leave-btn" disabled>Leave Room</button>
+            <button id="mute-audio-btn" disabled>Mute Audio</button>
+            <button id="mute-video-btn" disabled>Mute Video</button>
+            <button id="share-screen-btn" disabled>Share Screen</button>
+        </div>
+        <div class="main-content">
+            <div id="meet"></div>
+            <div class="sidebar">
+                <div class="participant-list">
+                    <h3>Participants</h3>
+                    <ul id="participant-list"></ul>
+                </div>
+                <div class="chat-box" id="chat-box">
+                    <p>Chat functionality coming soon...</p>
+                </div>
+            </div>
+        </div>
+        <div id="error-message" class="error-message"></div>
+    </div>
+
+    <script>
+        const APP_ID = 'vpaas-magic-cookie-0bcececeace64f9d8b006c01c91fa891';
+        const DOMAIN = '8x8.vc';
+
+        const joinBtn = document.getElementById('join-btn');
+        const leaveBtn = document.getElementById('leave-btn');
+        const muteAudioBtn = document.getElementById('mute-audio-btn');
+        const muteVideoBtn = document.getElementById('mute-video-btn');
+        const shareScreenBtn = document.getElementById('share-screen-btn');
+        const roomInput = document.getElementById('room-input');
+        const meetContainer = document.getElementById('meet');
+        const statusBar = document.getElementById('status-bar');
+        const errorMessage = document.getElementById('error-message');
+        const participantList = document.getElementById('participant-list');
+
+        let api = null;
+        let isAudioMuted = false;
+        let isVideoMuted = false;
+        let isScreenSharing = false;
+
+        // Join a room
+        joinBtn.addEventListener('click', () => {
+            const roomName = roomInput.value.trim() || 'DefaultRoom';
+            const fullRoomName = `${APP_ID}/${roomName}`;
+
+            try {
+                errorMessage.textContent = '';
+                if (api) api.dispose();
+
+                api = new JitsiMeetExternalAPI(DOMAIN, {
+                    roomName: fullRoomName,
+                    parentNode: meetContainer,
+                    width: '100%',
+                    height: '100%',
+                    configOverwrite: {
+                        startWithAudioMuted: false,
+                        startWithVideoMuted: false
+                    },
+                    interfaceConfigOverwrite: {
+                        TOOLBAR_BUTTONS: ['microphone', 'camera', 'desktop', 'hangup']
+                    }
+                });
+
+                api.addEventListener('videoConferenceJoined', () => {
+                    console.log('Joined room:', fullRoomName);
+                    joinBtn.disabled = true;
+                    leaveBtn.disabled = false;
+                    muteAudioBtn.disabled = false;
+                    muteVideoBtn.disabled = false;
+                    shareScreenBtn.disabled = false;
+                    statusBar.textContent = `Participants: 1 | Room: ${roomName}`;
+                    updateParticipants();
+                });
+
+                api.addEventListener('participantJoined', updateParticipants);
+                api.addEventListener('participantLeft', updateParticipants);
+                api.addEventListener('audioMuteStatusChanged', (event) => {
+                    isAudioMuted = event.muted;
+                    muteAudioBtn.textContent = isAudioMuted ? 'Unmute Audio' : 'Mute Audio';
+                    muteAudioBtn.classList.toggle('active', isAudioMuted);
+                });
+                api.addEventListener('videoMuteStatusChanged', (event) => {
+                    isVideoMuted = event.muted;
+                    muteVideoBtn.textContent = isVideoMuted ? 'Unmute Video' : 'Mute Video';
+                    muteVideoBtn.classList.toggle('active', isVideoMuted);
+                });
+                api.addEventListener('screenSharingStatusChanged', (event) => {
+                    isScreenSharing = event.on;
+                    shareScreenBtn.textContent = isScreenSharing ? 'Stop Sharing' : 'Share Screen';
+                    shareScreenBtn.classList.toggle('active', isScreenSharing);
+                });
+                api.addEventListener('errorOccurred', (err) => {
+                    handleError(err);
+                });
+            } catch (err) {
+                handleError(err);
+            }
+        });
+
+        // Leave the room
+        leaveBtn.addEventListener('click', () => {
+            if (api) {
+                api.executeCommand('hangup');
+                cleanup();
+            }
+        });
+
+        // Toggle audio mute
+        muteAudioBtn.addEventListener('click', () => {
+            if (api) {
+                api.executeCommand('toggleAudio');
+            }
+        });
+
+        // Toggle video mute
+        muteVideoBtn.addEventListener('click', () => {
+            if (api) {
+                api.executeCommand('toggleVideo');
+            }
+        });
+
+        // Toggle screen sharing
+        shareScreenBtn.addEventListener('click', () => {
+            if (api) {
+                api.executeCommand('toggleShareScreen');
+            }
+        });
+
+        // Update participant list
+        function updateParticipants() {
+            if (api) {
+                api.getParticipantsInfo().then(participants => {
+                    participantList.innerHTML = '';
+                    participants.forEach(participant => {
+                        const li = document.createElement('li');
+                        li.textContent = participant.displayName || 'Anonymous';
+                        participantList.appendChild(li);
+                    });
+                    statusBar.textContent = `Participants: ${participants.length} | Room: ${api.getRoomName().split('/')[1]}`;
+                });
+            }
+        }
+
+        // Handle errors
+        function handleError(err) {
+            console.error('Error:', err);
+            errorMessage.textContent = err.message || 'An error occurred. Check console for details.';
+        }
+
+        // Cleanup when leaving
+        function cleanup() {
+            if (api) {
+                api.dispose();
+                api = null;
+            }
+            meetContainer.innerHTML = '';
+            participantList.innerHTML = '';
+            statusBar.textContent = 'Participants: 0 | Room: Not Connected';
+            joinBtn.disabled = false;
+            leaveBtn.disabled = true;
+            muteAudioBtn.disabled = true;
+            muteVideoBtn.disabled = true;
+            shareScreenBtn.disabled = true;
+            muteAudioBtn.textContent = 'Mute Audio';
+            muteVideoBtn.textContent = 'Mute Video';
+            shareScreenBtn.textContent = 'Share Screen';
+            muteAudioBtn.classList.remove('active');
+            muteVideoBtn.classList.remove('active');
+            shareScreenBtn.classList.remove('active');
+            isAudioMuted = false;
+            isVideoMuted = false;
+            isScreenSharing = false;
+            errorMessage.textContent = '';
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', cleanup);
+    </script>
+</body>
+</html>
